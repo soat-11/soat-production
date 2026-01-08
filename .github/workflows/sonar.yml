@@ -27,18 +27,18 @@ jobs:
       - name: Rodar Testes e Gerar Coverage
         run: npm run test:cov
         env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: admin
-          DB_PASSWORD: password
-          DB_NAME: orders_db_test
-          PORT: 3000
-          SQS_ORDER_CREATED_URL: https://sqs.fake/order-created
-          SQS_PRODUCTION_STARTED_URL: https://sqs.fake/production-started
-          SQS_PRODUCTION_READY_URL: https://sqs.fake/production-ready
+          PORT: 3001
+          NODE_ENV: test
+          MONGO_URI: mongodb://localhost:27017/production_db_test
+          CART_SERVICE_URL: http://localhost:3000
           AWS_REGION: us-east-1
+          SQS_ENDPOINT: http://localhost:4566
           AWS_ACCESS_KEY_ID: fake
           AWS_SECRET_ACCESS_KEY: fake
+          SQS_PAYMENT_CONFIRMED_URL: https://sqs.fake/payment-confirmed
+          SQS_PRODUCTION_STARTED_URL: https://sqs.fake/production-started
+          SQS_PRODUCTION_READY_URL: https://sqs.fake/production-ready
+          SQS_PRODUCTION_WITHDRAWN_URL: https://sqs.fake/production-withdrawn
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
