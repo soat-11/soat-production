@@ -2,9 +2,9 @@ name: SOAT | FIAP | CI/CD Completo - Qualidade e Deploy
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
 
 permissions:
   id-token: write
