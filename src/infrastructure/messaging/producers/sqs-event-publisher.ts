@@ -1,7 +1,7 @@
-import { Injectable, Inject, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
-import { IEventPublisher } from "@core/domain/events/i-event-publisher";
+import { IEventPublisher } from "@domain/events/i-event-publisher";
 
 @Injectable()
 export class SqsEventPublisher implements IEventPublisher {
@@ -12,43 +12,40 @@ export class SqsEventPublisher implements IEventPublisher {
     private readonly configService: ConfigService
   ) {}
 
-  async publish<T>(eventName: string, payload: T): Promise<void> {
+  async publish(topic: string, payload: any): Promise<void> {
+    const queueUrl = this.getQueueUrl(topic);
+
+    if (!queueUrl) {
+      this.logger.warn(
+        `Tópico '${topic}' não tem fila configurada. Evento ignorado.`
+      );
+      return;
+    }
+
     try {
-      const queueUrl = this.getQueueUrl(eventName);
-
-      if (!queueUrl) {
-        this.logger.warn(
-          `Nenhuma fila configurada para o evento: ${eventName}`
-        );
-        return;
-      }
-
-      const messageBody = JSON.stringify({
-        pattern: eventName,
-        data: payload,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          service: "order-service",
-        },
-      });
-
       const command = new SendMessageCommand({
         QueueUrl: queueUrl,
-        MessageBody: messageBody,
+        MessageBody: JSON.stringify(payload),
       });
 
       await this.sqsClient.send(command);
-
-      this.logger.log(`Evento [${eventName}] publicado com sucesso na fila.`);
+      this.logger.log(
+        `Evento '${topic}' publicado com sucesso para pedido ${payload.sessionId}`
+      );
     } catch (error) {
-      this.logger.error(`Erro ao publicar evento [${eventName}]:`, error);
+      this.logger.error(`Erro ao publicar evento '${topic}':`, error);
+      throw error;
     }
   }
 
-  private getQueueUrl(eventName: string): string | undefined {
-    switch (eventName) {
-      case "order.created":
-        return this.configService.get<string>("SQS_ORDER_CREATED_URL");
+  private getQueueUrl(topic: string): string | undefined {
+    switch (topic) {
+      case "production.started":
+        return this.configService.get<string>("SQS_PRODUCTION_STARTED_URL");
+      case "production.ready":
+        return this.configService.get<string>("SQS_PRODUCTION_READY_URL");
+      case "production.withdrawn":
+        return this.configService.get<string>("SQS_PRODUCTION_WITHDRAWN_URL");
       default:
         return undefined;
     }

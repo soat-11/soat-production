@@ -3,7 +3,7 @@ import { AppModule } from "./app.module";
 import { ValidationPipe, Logger } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
-import { AllExceptionsFilter } from "@infra/http/filters/http-exception.filter";
+import { AllExceptionsFilter } from "@infra/http/filters/all-exception.filter";
 
 async function bootstrap() {
   const logger = new Logger("Bootstrap");

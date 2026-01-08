@@ -5,10 +5,13 @@ import {
   ProductionOrderModel,
   ProductionOrderSchema,
 } from "../database/mongoose/schemas/production-order.schema";
-
-// Controllers e UseCases vamos adicionar em breve, deixei comentado
-// import { ProductionController } from "../../interface/controllers/production.controller";
-// import { ProductionRepository } from "../database/mongoose/repositories/production.repository";
+import { ProductionRepository } from "../database/mongoose/repositories/production.repository";
+import { ProductionEventsConsumer } from "../messaging/consumers/production-events.consumer";
+import { ReceiveApprovedOrderUseCase } from "@core/use-cases/receive-approved-order.use-case";
+import { ListProductionOrdersUseCase } from "@core/use-cases/list-production-orders.use-case";
+import { UpdateProductionStatusUseCase } from "@core/use-cases/update-production-status.use-case";
+import { ProductionController } from "@infra/http/controllers/production.controller";
+import { CartGateway } from "@infra/gayteways/cart.gateway";
 
 @Module({
   imports: [
@@ -17,10 +20,13 @@ import {
       { name: ProductionOrderModel.name, schema: ProductionOrderSchema },
     ]),
   ],
-  controllers: [],
+  controllers: [ProductionController],
   providers: [
-    // Aqui virão os UseCases e o Repository Implementation
-    // { provide: 'IProductionRepository', useClass: ProductionRepository }
+    ProductionEventsConsumer,
+    { provide: "IProductionRepository", useClass: ProductionRepository },
+    ReceiveApprovedOrderUseCase,
+    ListProductionOrdersUseCase,
+    UpdateProductionStatusUseCase,
   ],
   exports: [],
 })

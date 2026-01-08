@@ -6,81 +6,102 @@ import {
 } from "@nestjs/common";
 import { Consumer } from "sqs-consumer";
 import { SQSClient } from "@aws-sdk/client-sqs";
-import { OrderStatus } from "@core/domain/enum/order-status.enum";
+import { ConfigService } from "@nestjs/config";
+import { ReceiveApprovedOrderUseCase } from "@core/use-cases/receive-approved-order.use-case";
+import { CartGateway } from "@infra/gayteways/cart.gateway";
+
+interface PaymentConfirmedMessage {
+  sessionId: string;
+  idempotencyKey: string;
+}
 
 @Injectable()
 export class ProductionEventsConsumer implements OnModuleInit, OnModuleDestroy {
-  private consumers: Consumer[] = [];
+  private consumer: Consumer;
   private readonly logger = new Logger(ProductionEventsConsumer.name);
 
-  constructor() {}
-  onModuleDestroy() {
-    throw new Error("Method not implemented.");
-  }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly receiveApprovedOrderUseCase: ReceiveApprovedOrderUseCase,
+    private readonly cartGateway: CartGateway
+  ) {}
 
   onModuleInit() {
-    this.logger.log("Iniciando consumidores SQS...");
+    const queueUrl = this.configService.get<string>(
+      "SQS_PAYMENT_CONFIRMED_URL"
+    );
 
-    //   // 1. Ouvinte: production.started -> Muda para IN_PREPARATION
-    //   const startedConsumer = this.createConsumer(
-    //     process.env.SQS_PRODUCTION_STARTED_URL!,
-    //     OrderStatus.IN_PREPARATION
-    //   );
+    this.logger.log(`Iniciando consumidor de pagamentos na fila: ${queueUrl}`);
 
-    //   // 2. Ouvinte: production.ready -> Muda para READY
-    //   const readyConsumer = this.createConsumer(
-    //     process.env.SQS_PRODUCTION_READY_URL!,
-    //     OrderStatus.READY
-    //   );
+    this.consumer = Consumer.create({
+      queueUrl,
+      sqs: new SQSClient({
+        region: this.configService.get<string>("AWS_REGION"),
+        endpoint: this.configService.get<string>("SQS_ENDPOINT"),
+        credentials: {
+          accessKeyId:
+            this.configService.get<string>("AWS_ACCESS_KEY_ID") || "test",
+          secretAccessKey:
+            this.configService.get<string>("AWS_SECRET_ACCESS_KEY") || "test",
+        },
+      }),
+      handleMessage: async (message) => {
+        try {
+          const body = JSON.parse(message.Body!);
+          const payload = (
+            body.Message ? JSON.parse(body.Message) : body
+          ) as PaymentConfirmedMessage;
 
-    //   this.consumers.push(startedConsumer, readyConsumer);
-    //   this.consumers.forEach((c) => c.start());
-    // }
+          if (!payload.sessionId) {
+            this.logger.error("Evento ignorado: sessionId ausente.");
+            return;
+          }
 
-    // onModuleDestroy() {
-    //   this.logger.log("Parando consumidores SQS...");
-    //   this.consumers.forEach((c) => c.stop());
-    // }
+          this.logger.log(
+            `Processando pagamento. SessionID: ${payload.sessionId}`
+          );
 
-    // private createConsumer(
-    //   queueUrl: string,
-    //   targetStatus: OrderStatus
-    // ): Consumer {
-    //   return Consumer.create({
-    //     queueUrl,
-    //     sqs: new SQSClient({
-    //       region: process.env.AWS_REGION || "us-east-1",
-    //       endpoint: process.env.SQS_ENDPOINT || "http://localhost:4566",
-    //       credentials: { accessKeyId: "test", secretAccessKey: "test" },
-    //     }),
-    //     handleMessage: async (message) => {
-    //       try {
-    //         const body = JSON.parse(message.Body!);
-    //         const orderId = body.orderId;
+          const cart = await this.cartGateway.getCartBySessionId(
+            payload.sessionId
+          );
 
-    //         this.logger.log(
-    //           `Mensagem recebida da fila [${targetStatus}]. OrderID: ${orderId}`
-    //         );
+          if (!cart) {
+            this.logger.warn(
+              `Carrinho vazio ou não encontrado. Pedido cancelado/ignorado.`
+            );
+            return;
+          }
 
-    //         const result = await this.updateOrderStatusUseCase.execute(
-    //           orderId,
-    //           targetStatus
-    //         );
+          const productionItems = cart.items.map((item) => ({
+            sku: item.sku,
+            quantity: item.quantity,
+          }));
 
-    //         if (result.isFailure) {
-    //           this.logger.error(
-    //             `Erro ao atualizar pedido ${orderId}: ${result.error}`
-    //           );
-    //         } else {
-    //           this.logger.log(
-    //             `Pedido ${orderId} atualizado para ${targetStatus} com sucesso.`
-    //           );
-    //         }
-    //       } catch (error) {
-    //         this.logger.error("Erro ao processar mensagem SQS:", error);
-    //         throw error;
-    //       }
-    //     },
-    //   });
+          const result = await this.receiveApprovedOrderUseCase.execute(
+            payload.sessionId,
+            productionItems
+          );
+
+          if (result.isFailure) {
+            this.logger.error(
+              `Falha no domínio ao criar pedido: ${result.error}`
+            );
+          } else {
+            this.logger.log(
+              `Pedido criado com sucesso na cozinha! Itens: ${productionItems.length}`
+            );
+          }
+        } catch (error) {
+          this.logger.error("Erro fatal no consumer:", error);
+          throw error;
+        }
+      },
+    });
+
+    this.consumer.start();
+  }
+
+  onModuleDestroy() {
+    if (this.consumer) this.consumer.stop();
   }
 }

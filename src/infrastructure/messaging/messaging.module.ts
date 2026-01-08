@@ -2,10 +2,12 @@ import { Module, Global } from "@nestjs/common";
 import { SQSClient } from "@aws-sdk/client-sqs";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { SqsEventPublisher } from "./producers/sqs-event-publisher";
+import { HttpModule } from "@nestjs/axios";
+import { CartGateway } from "@infra/gayteways/cart.gateway";
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, HttpModule],
   providers: [
     {
       provide: "SQS_CLIENT",
@@ -26,7 +28,9 @@ import { SqsEventPublisher } from "./producers/sqs-event-publisher";
       provide: "IEventPublisher",
       useClass: SqsEventPublisher,
     },
+    SqsEventPublisher,
+    CartGateway,
   ],
-  exports: ["IEventPublisher", "SQS_CLIENT"],
+  exports: ["IEventPublisher", "SQS_CLIENT", CartGateway],
 })
 export class MessagingModule {}

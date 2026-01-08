@@ -5,8 +5,8 @@ export type ProductionOrderDocument = HydratedDocument<ProductionOrderModel>;
 
 @Schema({ collection: "production_orders", timestamps: true })
 export class ProductionOrderModel {
-  @Prop({ required: true })
-  orderId: string;
+  @Prop({ required: true, unique: true })
+  sessionId: string;
 
   @Prop({ required: true })
   status: string;

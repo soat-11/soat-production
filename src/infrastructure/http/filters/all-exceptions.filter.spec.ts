@@ -1,4 +1,4 @@
-import { AllExceptionsFilter } from "./http-exception.filter";
+import { AllExceptionsFilter } from "./all-exception.filter";
 import {
   ArgumentsHost,
   HttpException,
