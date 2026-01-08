@@ -1,0 +1,91 @@
+name: SOAT | FIAP | CI/CD Completo - Qualidade e Deploy
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_NAME: production
+  EKS_CLUSTER_NAME: soat-challenge-eks-cluster
+
+jobs:
+  quality_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar Build (Compilação)
+        run: npm run build
+
+      - name: Rodar testes com cobertura
+        run: npm run test:cov
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: admin
+          DB_PASSWORD: password
+          DB_NAME: orders_db_test
+          PORT: 3000
+          SQS_ORDER_CREATED_URL: https://sqs.us-east-1.amazonaws.com/000/order-created
+          SQS_PRODUCTION_STARTED_URL: https://sqs.us-east-1.amazonaws.com/000/production-started
+          SQS_PRODUCTION_READY_URL: https://sqs.us-east-1.amazonaws.com/000/production-ready
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: fake
+          AWS_SECRET_ACCESS_KEY: fake
+
+  build_and_deploy:
+    needs: quality_check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar as credenciais da AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Fazer login no Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construir e enviar a imagem Docker para o ECR
+        run: |
+          # Simplificado para usar sempre :latest
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_NAME }}:latest
+          echo "Building and pushing image: $IMAGE_URI"
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+
+      - name: Configurar o kubeconfig para o cluster EKS
+        run: aws eks --region ${{ env.AWS_REGION }} update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Implantação no EKS
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_NAME }}:latest
+
+          # Alterado: Atualiza o deployment 'production-deployment' no container 'production-container'
+          kubectl set image deployment/production-deployment production-container="$IMAGE_URI"
+
+          kubectl rollout restart deployment/production-deployment
+          kubectl rollout status deployment/production-deployment

@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  # --- Banco de Dados (MongoDB) ---
+  mongodb:
+    image: mongo:8.0
+    container_name: production-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - soat-network
+
+  # --- Mock da AWS (SQS) ---
+  localstack:
+    image: localstack/localstack:latest
+    container_name: production-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=1
+    volumes:
+      # Script que cria as filas automaticamente ao subir
+      - "./scripts/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh"
+    networks:
+      - soat-network
+
+volumes:
+  mongo_data:
+
+networks:
+  soat-network:
+    driver: bridge
