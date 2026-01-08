@@ -1,2 +1,3 @@
-# soat-production
-Este serviço é responsável por gerenciar o fluxo operacional dos pedidos dentro da cozinha. Ele atua de forma desacoplada do serviço de vendas (Order Service), garantindo que a operação da cozinha continue funcionando independentemente de falhas no checkout ou pagamentos.
+# 🍳 Production Service (Cozinha)
+
+Microsserviço responsável pelo gerenciamento da fila de pedidos da cozinha. Recebe notificações de pagamento, consulta os itens do pedido e gerencia o status de preparação (Recebido -> Em Preparo -> Pronto -> Entregue).
