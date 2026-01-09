@@ -84,8 +84,8 @@ jobs:
         run: |
           IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_NAME }}:latest
 
-          # Alterado: Atualiza o deployment 'production-deployment' no container 'production-container'
-          kubectl set image deployment/production-deployment production-container="$IMAGE_URI"
+          # Alterado: Atualiza o deployment 'production-deployment' no container 'production'
+          kubectl set image deployment/production-deployment production="$IMAGE_URI"
 
           kubectl rollout restart deployment/production-deployment
           kubectl rollout status deployment/production-deployment
