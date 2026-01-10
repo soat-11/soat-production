@@ -31,29 +31,27 @@ export class ProductionEventsConsumer implements OnModuleInit, OnModuleDestroy {
       "SQS_PAYMENT_CONFIRMED_URL"
     );
 
-    this.logger.log(`Iniciando consumidor de pagamentos na fila: ${queueUrl}`);
-
     this.consumer = Consumer.create({
       queueUrl,
       sqs: new SQSClient({
-        region: this.configService.get<string>("AWS_REGION"),
-        endpoint: this.configService.get<string>("SQS_ENDPOINT"),
+        region: process.env.AWS_REGION || "us-east-1",
+        ...(process.env.AWS_ENDPOINT && { endpoint: process.env.AWS_ENDPOINT }),
         credentials: {
-          accessKeyId:
-            this.configService.get<string>("AWS_ACCESS_KEY_ID") || "test",
-          secretAccessKey:
-            this.configService.get<string>("AWS_SECRET_ACCESS_KEY") || "test",
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || "test",
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "test",
         },
       }),
       handleMessage: async (message) => {
         try {
+          this.logger.debug(`Mensagem SQS capturada: ${message.MessageId}`);
+
           const body = JSON.parse(message.Body!);
           const payload = (
             body.Message ? JSON.parse(body.Message) : body
           ) as PaymentConfirmedMessage;
 
           if (!payload.sessionId) {
-            this.logger.error("Evento ignorado: sessionId ausente.");
+            this.logger.error("Evento ignorado: sessionId ausente no payload.");
             return;
           }
 
@@ -67,7 +65,7 @@ export class ProductionEventsConsumer implements OnModuleInit, OnModuleDestroy {
 
           if (!cart) {
             this.logger.warn(
-              `Carrinho vazio ou não encontrado. Pedido cancelado/ignorado.`
+              `Carrinho vazio ou não encontrado session ${payload.sessionId}`
             );
             return;
           }
@@ -84,18 +82,30 @@ export class ProductionEventsConsumer implements OnModuleInit, OnModuleDestroy {
 
           if (result.isFailure) {
             this.logger.error(
-              `Falha no domínio ao criar pedido: ${result.error}`
+              `Falha no domínio ao criar pedido: ${result.getValue()}`
             );
-          } else {
-            this.logger.log(
-              `Pedido criado com sucesso na cozinha! Itens: ${productionItems.length}`
-            );
+            return;
           }
+
+          this.logger.log(
+            `SUCESSO! Pedido criado na cozinha. Session: ${payload.sessionId}`
+          );
         } catch (error) {
-          this.logger.error("Erro fatal no consumer:", error);
+          this.logger.error(
+            "Erro fatal no processamento da mensagem SQS:",
+            error
+          );
           throw error;
         }
       },
+    });
+
+    this.consumer.on("error", (err) => {
+      this.logger.error(`Erro no Consumer SQS: ${err.message}`);
+    });
+
+    this.consumer.on("processing_error", (err) => {
+      this.logger.error(`Erro de processamento: ${err.message}`);
     });
 
     this.consumer.start();

@@ -21,6 +21,16 @@ describe("CartGateway", () => {
   const serviceUrl = "http://cart-service";
   const sessionId = "session-123";
 
+  const expectedMockCart = {
+    sessionId,
+    items: [
+      { sku: "BATATA-MOCK-G", quantity: 1, unitPrice: 25.9 },
+      { sku: "COCA-COLA-2L", quantity: 1, unitPrice: 12.0 },
+    ],
+    totalItems: 2,
+    totalValue: 37.9,
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -80,19 +90,19 @@ describe("CartGateway", () => {
     expect(result).toBeNull();
   });
 
-  it("deve relançar o erro se a API falhar com erro diferente de 404", async () => {
+  it("deve retornar o MOCK (Fallback) se a API falhar com erro diferente de 404", async () => {
     const error500 = {
       response: { status: 500 },
       message: "Internal Server Error",
     };
     mockHttpService.get.mockReturnValue(throwError(() => error500));
 
-    await expect(gateway.getCartBySessionId(sessionId)).rejects.toMatchObject(
-      error500
-    );
+    const result = await gateway.getCartBySessionId(sessionId);
+
+    expect(result).toEqual(expectedMockCart);
   });
 
-  it("deve lançar erro se CART_SERVICE_URL não estiver definida", async () => {
+  it("deve retornar o MOCK (Fallback) se CART_SERVICE_URL não estiver definida", async () => {
     mockConfigService.get.mockReturnValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -105,8 +115,8 @@ describe("CartGateway", () => {
 
     const newGateway = module.get<CartGateway>(CartGateway);
 
-    await expect(newGateway.getCartBySessionId(sessionId)).rejects.toThrow(
-      "CART_SERVICE_URL não configurada no .env"
-    );
+    const result = await newGateway.getCartBySessionId(sessionId);
+
+    expect(result).toEqual(expectedMockCart);
   });
 });

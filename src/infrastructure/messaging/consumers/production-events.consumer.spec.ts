@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { ReceiveApprovedOrderUseCase } from "@core/use-cases/receive-approved-order.use-case";
 import { CartGateway } from "@infra/gayteways/cart.gateway";
 import { Consumer } from "sqs-consumer";
+import { Logger } from "@nestjs/common";
 
 jest.mock("sqs-consumer", () => ({
   Consumer: {
@@ -22,7 +23,13 @@ describe("ProductionEventsConsumer", () => {
     mockConsumerInstance = {
       start: jest.fn(),
       stop: jest.fn(),
+      on: jest.fn(),
     };
+
+    jest.spyOn(Logger.prototype, "log").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, "error").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, "debug").mockImplementation(() => {});
 
     (Consumer.create as jest.Mock).mockReturnValue(mockConsumerInstance);
 
@@ -75,6 +82,14 @@ describe("ProductionEventsConsumer", () => {
       expect.objectContaining({
         queueUrl: "http://sqs-url",
       })
+    );
+    expect(mockConsumerInstance.on).toHaveBeenCalledWith(
+      "error",
+      expect.any(Function)
+    );
+    expect(mockConsumerInstance.on).toHaveBeenCalledWith(
+      "processing_error",
+      expect.any(Function)
     );
     expect(mockConsumerInstance.start).toHaveBeenCalled();
   });
@@ -172,9 +187,10 @@ describe("ProductionEventsConsumer", () => {
       (cartGateway.getCartBySessionId as jest.Mock).mockResolvedValue({
         items: [],
       });
+
       (useCase.execute as jest.Mock).mockResolvedValue({
         isFailure: true,
-        error: "Erro de dominio",
+        getValue: jest.fn().mockReturnValue("Erro de dominio simulado"),
       });
 
       await handleMessage(message);

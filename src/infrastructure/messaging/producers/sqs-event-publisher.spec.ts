@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { SqsEventPublisher } from "./sqs-event-publisher";
 import { ConfigService } from "@nestjs/config";
+import { Logger } from "@nestjs/common";
 
 jest.mock("@aws-sdk/client-sqs", () => {
   return {
@@ -24,6 +25,11 @@ describe("SqsEventPublisher", () => {
     sqsClientMock = {
       send: jest.fn(),
     };
+
+    jest.spyOn(Logger.prototype, "log").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, "error").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, "debug").mockImplementation(() => {});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
