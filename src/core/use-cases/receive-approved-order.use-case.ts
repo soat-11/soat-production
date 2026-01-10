@@ -33,9 +33,6 @@ export class ReceiveApprovedOrderUseCase {
 
       await this.repository.save(newOrder);
 
-      this.logger.log(
-        `Pedido ${sessionId} registrado na cozinha com status RECEIVED.`
-      );
       return Result.ok();
     } catch (error) {
       const errorMessage =
