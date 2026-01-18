@@ -63,7 +63,7 @@ describe("CartGateway", () => {
     const result = await gateway.getCartBySessionId(sessionId);
 
     expect(result).toEqual(mockCartOutput);
-    expect(httpService.get).toHaveBeenCalledWith(`${serviceUrl}/v1/cart`, {
+    expect(httpService.get).toHaveBeenCalledWith(`${serviceUrl}/cart`, {
       headers: { "x-session-id": sessionId },
     });
   });
@@ -88,7 +88,7 @@ describe("CartGateway", () => {
     mockHttpService.get.mockReturnValue(throwError(() => error500));
 
     await expect(gateway.getCartBySessionId(sessionId)).rejects.toMatchObject(
-      error500
+      error500,
     );
   });
 
@@ -106,7 +106,7 @@ describe("CartGateway", () => {
     const newGateway = module.get<CartGateway>(CartGateway);
 
     await expect(newGateway.getCartBySessionId(sessionId)).rejects.toThrow(
-      "CART_SERVICE_URL não configurada no .env"
+      "CART_SERVICE_URL não configurada no .env",
     );
   });
 });
