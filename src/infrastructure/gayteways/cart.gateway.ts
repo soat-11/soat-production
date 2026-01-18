@@ -28,7 +28,7 @@ export class CartGateway {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
   ) {
     this.cartServiceUrl = this.configService.get<string>("CART_SERVICE_URL");
   }
@@ -39,10 +39,10 @@ export class CartGateway {
         throw new Error("CART_SERVICE_URL não configurada no .env");
       }
 
-      const url = `${this.cartServiceUrl}/v1/cart`;
+      const url = `${this.cartServiceUrl}/cart`;
 
       this.logger.log(
-        `Consultando carrinho em: ${url} [Session: ${sessionId}]`
+        `Consultando carrinho em: ${url} [Session: ${sessionId}]`,
       );
 
       const response$ = this.httpService.get<CartApiResponse>(url, {
@@ -56,12 +56,12 @@ export class CartGateway {
     } catch (error) {
       if (error.response?.status === 404) {
         this.logger.warn(
-          `Carrinho não encontrado para sessão ${sessionId} (404)`
+          `Carrinho não encontrado para sessão ${sessionId} (404)`,
         );
         return null;
       }
       this.logger.error(
-        `Erro de comunicação com Cart Service: ${error.message}`
+        `Erro de comunicação com Cart Service: ${error.message}`,
       );
       throw error;
     }
